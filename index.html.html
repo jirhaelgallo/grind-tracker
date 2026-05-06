@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#0A0A0F"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Grind"/>
+<title>Grind Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+
+<!-- PWA Manifest inline -->
+<link rel="manifest" href="data:application/manifest+json,{
+  %22name%22:%22Grind Tracker%22,
+  %22short_name%22:%22Grind%22,
+  %22start_url%22:%22.%22,
+  %22display%22:%22standalone%22,
+  %22background_color%22:%22%230A0A0F%22,
+  %22theme_color%22:%22%230A0A0F%22,
+  %22description%22:%22Your personal bodyweight fitness tracker%22,
+  %22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230A0A0F'/%3E%3Ctext x='50%25' y='58%25' font-size='300' text-anchor='middle' dominant-baseline='middle' fill='%23C8F135'%3E⚡%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22512x512%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any maskable%22}]
+}"/>
+
+<style>
+  :root {
+    --bg: #0A0A0F;
+    --surface: #111118;
+    --border: #1C1C28;
+    --accent: #C8F135;
+    --accent-dim: rgba(200,241,53,0.12);
+    --orange: #FF6B35;
+    --teal: #4ECDC4;
+    --purple: #A78BFA;
+    --gold: #F7B731;
+    --text: #E8E8E0;
+    --muted: #888;
+    --dim: #444;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); overflow: hidden; }
+  body {
+    font-family: 'DM Mono', 'Courier New', monospace;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  .bebas { font-family: 'Bebas Neue', sans-serif; }
+
+  /* Layout */
+  #app { display: flex; flex-direction: column; height: 100%; }
+  #header {
+    padding: calc(var(--safe-top) + 20px) 18px 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 0 calc(var(--safe-bottom) + 80px);
+  }
+  #nav {
+    position: fixed;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 100%; max-width: 500px;
+    background: rgba(10,10,15,0.95);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding-bottom: var(--safe-bottom);
+    z-index: 100;
+  }
+  .nav-btn {
+    flex: 1; border: none; background: none; cursor: pointer;
+    padding: 14px 0 12px; display: flex; flex-direction: column;
+    align-items: center; gap: 4; color: var(--dim);
+    font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 1.5px;
+    transition: color 0.2s;
+  }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+
+  /* Header */
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+  .app-title { font-family: 'Bebas Neue'; font-size: 30px; letter-spacing: 3px; color: var(--accent); line-height: 1; }
+  .app-sub { font-size: 10px; color: #444; letter-spacing: 2px; margin-top: 3px; }
+  .streak-box { text-align: right; }
+  .streak-num { font-family: 'Bebas Neue'; font-size: 34px; color: var(--accent); line-height: 1; }
+  .streak-label { font-size: 9px; color: #444; letter-spacing: 2px; }
+
+  /* Week strip */
+  .week-strip { display: flex; gap: 5px; margin-bottom: 16px; }
+  .week-day { flex: 1; text-align: center; }
+  .week-day-label { font-size: 9px; letter-spacing: 1px; margin-bottom: 4px; color: var(--dim); }
+  .week-day-label.today-lbl { color: var(--accent); }
+  .week-day-dot {
+    aspect-ratio: 1; border-radius: 5px; display: flex;
+    align-items: center; justify-content: center;
+    font-size: 10px; color: #333; background: #111;
+    border: 1.5px solid transparent;
+  }
+  .week-day-dot.today { border-color: var(--accent); color: var(--accent); }
+  .week-day-dot.done { background: var(--accent); color: #0A0A0F; font-size: 12px; }
+
+  /* Stats bar */
+  .stats-bar { display: flex; border-top: 1px solid var(--border); }
+  .stat { flex: 1; padding: 12px 0; text-align: center; border-right: 1px solid var(--border); }
+  .stat:last-child { border-right: none; }
+  .stat-val { font-family: 'Bebas Neue'; font-size: 22px; color: var(--text); line-height: 1; }
+  .stat-label { font-size: 8px; color: var(--dim); letter-spacing: 2px; margin-top: 2px; }
+
+  /* Sections */
+  .section { padding: 20px 16px; }
+  .section-label { font-size: 10px; color: var(--dim); letter-spacing: 2.5px; margin-bottom: 14px; }
+
+  /* Workout cards */
+  .workout-card {
+    background: var(--surface); border-radius: 12px;
+    border-left: 4px solid var(--c); border: 1px solid rgba(255,255,255,0.04);
+    border-left: 4px solid var(--c);
+    padding: 16px; margin-bottom: 10px; cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    display: flex; justify-content: space-between; align-items: center;
+    -webkit-user-select: none;
+  }
+  .workout-card:active { transform: scale(0.98); }
+  .workout-card-name { font-family: 'Bebas Neue'; font-size: 20px; letter-spacing: 2px; color: var(--c); }
+  .workout-card-sub { font-size: 11px; color: var(--dim); margin-top: 3px; }
+  .workout-card-btn {
+    background: var(--c); color: #0A0A0F; border-radius: 8px;
+    padding: 8px 14px; font-size: 11px; font-family: 'DM Mono'; font-weight: 500;
+    letter-spacing: 1px; white-space: nowrap; flex-shrink: 0;
+  }
+
+  /* Today logged */
+  .logged-box {
+    background: #0D1A0D; border: 1px solid #1E2D1E;
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 18px;
+  }
+  .logged-title { font-size: 10px; color: #4CAF50; letter-spacing: 2px; margin-bottom: 10px; }
+  .logged-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  .logged-item + .logged-item { border-top: 1px solid #1C2C1C; }
+  .logged-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .logged-name { font-size: 13px; color: var(--accent); flex: 1; }
+  .logged-meta { font-size: 11px; color: var(--dim); }
+
+  /* Sport quick log */
+  .sport-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sport-chip {
+    padding: 8px 14px; background: var(--surface); border-radius: 20px;
+    border: 1px solid var(--border); font-size: 12px; color: var(--muted);
+    cursor: pointer; transition: all 0.15s; -webkit-user-select: none;
+  }
+  .sport-chip:active { background: var(--border); transform: scale(0.97); }
+
+  /* Active workout */
+  #active-screen {
+    display: none; position: fixed; inset: 0;
+    background: var(--bg); z-index: 200;
+    flex-direction: column;
+    max-width: 500px; margin: 0 auto;
+  }
+  #active-screen.open { display: flex; }
+  .active-header {
+    padding: calc(var(--safe-top) + 16px) 16px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+    flex-shrink: 0;
+  }
+  .back-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 22px; padding: 4px 8px;
+    line-height: 1;
+  }
+  .active-title { font-family: 'Bebas Neue'; font-size: 24px; letter-spacing: 2px; color: var(--c); }
+  .active-sub { font-size: 11px; color: var(--dim); letter-spacing: 1px; }
+  .active-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; }
+
+  /* Rounds */
+  .rounds-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 16px;
+  }
+  .rounds-label { font-size: 10px; color: var(--dim); letter-spacing: 2px; flex: 1; }
+  .round-dot {
+    width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
+    font-family: 'Bebas Neue'; font-size: 18px;
+    background: var(--border); color: var(--dim);
+    transition: all 0.15s; -webkit-user-select: none;
+  }
+  .round-dot.active-round { background: var(--c); color: #0A0A0F; }
+  .round-dot:active { transform: scale(0.92); }
+
+  /* Exercise list */
+  .exercise-list { border-radius: 12px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 16px; }
+  .exercise-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px; cursor: pointer; background: var(--surface);
+    transition: background 0.15s; -webkit-user-select: none;
+  }
+  .exercise-row + .exercise-row { border-top: 1px solid var(--border); }
+  .exercise-row.checked { background: rgba(200,241,53,0.06); }
+  .ex-check {
+    width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+    border: 2px solid var(--border); display: flex; align-items: center;
+    justify-content: center; font-size: 14px; color: #0A0A0F;
+    transition: all 0.2s;
+  }
+  .ex-check.done { border-color: var(--c); background: var(--c); }
+  .ex-name { font-size: 14px; transition: all 0.2s; }
+  .ex-name.done { color: var(--dim); text-decoration: line-through; }
+  .ex-target { font-size: 11px; color: var(--dim); margin-top: 2px; }
+
+  /* Note */
+  .note-area {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; color: var(--muted);
+    font-size: 12px; font-family: 'DM Mono'; resize: none; height: 70px;
+    outline: none; letter-spacing: 0.3px; margin-bottom: 14px;
+  }
+  .note-area:focus { border-color: var(--dim); }
+
+  /* Finish btn */
+  .finish-btn {
+    width: 100%; padding: 16px; border: none; border-radius: 12px;
+    font-family: 'Bebas Neue'; font-size: 22px; letter-spacing: 3px;
+    cursor: pointer; transition: all 0.2s; margin-bottom: 8px;
+    background: var(--border); color: var(--dim);
+  }
+  .finish-btn.ready { background: var(--accent); color: #0A0A0F; }
+  .finish-btn:active { transform: scale(0.98); }
+
+  /* Complete overlay */
+  #complete-overlay {
+    display: none; position: fixed; inset: 0;
+    background: var(--bg); z-index: 300;
+    flex-direction: column; align-items: center; justify-content: center;
+  }
+  #complete-overlay.show { display: flex; animation: popIn 0.3s ease; }
+  @keyframes popIn { from { opacity:0; transform:scale(0.85) } to { opacity:1; transform:scale(1) } }
+  @keyframes slideUp { from { transform:translateY(100%) } to { transform:translateY(0) } }
+  .del-btn {
+    background: none; border: none; cursor: pointer; padding: 6px;
+    color: #333; font-size: 16px; line-height: 1; transition: color 0.2s;
+    flex-shrink: 0;
+  }
+  .del-btn:active { color: #FF6B35; }
+  .clear-all-btn {
+    background: none; border: 1px solid #2C2C38; border-radius: 8px;
+    color: #555; font-family: 'DM Mono'; font-size: 10px; letter-spacing: 1.5px;
+    padding: 6px 12px; cursor: pointer; transition: all 0.2s;
+  }
+  .clear-all-btn:active { border-color: #FF6B35; color: #FF6B35; }
+  .complete-big { font-family: 'Bebas Neue'; font-size: 80px; color: var(--accent); letter-spacing: 4px; line-height: 1; }
+  .complete-sub { font-size: 14px; color: var(--dim); letter-spacing: 3px; margin-top: 12px; }
+
+  /* History */
+  .history-day { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin: 0 16px 14px; overflow: hidden; }
+  .history-day-header { padding: 11px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .history-day-date { font-size: 11px; color: var(--muted); letter-spacing: 1.5px; }
+  .history-day-count { font-size: 11px; color: var(--accent); }
+  .history-item { padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+  .history-item + .history-item { border-top: 1px solid var(--border); }
+  .history-item-name { font-size: 13px; flex: 1; }
+  .history-item-meta { font-size: 11px; color: var(--dim); }
+  .history-item-note { font-size: 11px; color: var(--dim); font-style: italic; padding: 0 16px 12px 38px; }
+  .empty-state { text-align: center; color: #333; font-size: 13px; padding: 60px 20px; line-height: 2; }
+
+  /* Plan */
+  .plan-row { display: flex; gap: 14px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .plan-day-name { width: 36px; font-size: 10px; color: var(--dim); letter-spacing: 1px; flex-shrink: 0; }
+  .plan-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .plan-activity { font-size: 13px; color: var(--text); }
+  .plan-note { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .timeline-item { display: flex; gap: 14px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .timeline-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .timeline-period { width: 80px; font-size: 10px; color: var(--dim); flex-shrink: 0; }
+  .timeline-text { font-size: 12px; color: var(--muted); }
+  .tip-row { padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--dim); line-height: 1.6; }
+
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #1C2C1C; color: var(--accent); padding: 10px 20px;
+    border-radius: 20px; font-size: 12px; letter-spacing: 1px;
+    opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 400;
+    border: 1px solid var(--accent);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="header">
+    <div class="header-top">
+      <div>
+        <div class="app-title bebas">GRIND TRACKER</div>
+        <div class="app-sub">YOUR BODY. YOUR RULES.</div>
+      </div>
+      <div class="streak-box">
+        <div class="streak-num bebas" id="streak-num">0</div>
+        <div class="streak-label">DAY STREAK</div>
+      </div>
+    </div>
+    <div class="week-strip" id="week-strip"></div>
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-val bebas" id="stat-total">0</div><div class="stat-label">WORKOUTS</div></div>
+      <div class="stat"><div class="stat-val bebas" id="stat-streak">0</div><div class="stat-label">STREAK</div></div>
+      <div class="stat"><div class="stat-val bebas" id="stat-week">0</div><div class="stat-label">THIS WEEK</div></div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div id="content">
+
+    <!-- TODAY TAB -->
+    <div id="tab-today" class="tab-content">
+      <div class="section">
+        <div class="section-label" id="today-date-label">TODAY</div>
+        <div id="today-logged" style="display:none"></div>
+        <div class="section-label">PICK A WORKOUT</div>
+        <div id="workout-cards"></div>
+        <div style="margin-top:18px">
+          <div class="section-label">LOG SPORT / ACTIVITY</div>
+          <div class="sport-grid" id="sport-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="tab-history" class="tab-content" style="display:none">
+      <div style="padding:20px 0 0">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:0 16px; margin-bottom:14px;">
+          <div class="section-label" style="margin-bottom:0">WORKOUT LOG</div>
+          <button class="clear-all-btn" onclick="confirmClearAll()">CLEAR ALL</button>
+        </div>
+        <div id="history-list"></div>
+      </div>
+    </div>
+
+    <!-- PLAN TAB -->
+    <div id="tab-plan" class="tab-content" style="display:none">
+      <div style="padding:20px 0 0">
+        <div class="section-label" style="padding-left:16px">WEEKLY STRUCTURE</div>
+        <div id="plan-list"></div>
+        <div class="section-label" style="padding-left:16px; margin-top:24px">YOUR TIMELINE</div>
+        <div id="timeline-list"></div>
+        <div style="margin:20px 16px; background:#0D1A0D; border:1px solid #1E2D1E; border-radius:12px; padding:16px;">
+          <div style="font-size:10px; color:#4CAF50; letter-spacing:2px; margin-bottom:10px">💡 PRO TIPS</div>
+          <div id="tips-list"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav id="nav">
+    <button class="nav-btn active" id="nav-today" onclick="switchTab('today')">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      TODAY
+    </button>
+    <button class="nav-btn" id="nav-history" onclick="switchTab('history')">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      HISTORY
+    </button>
+    <button class="nav-btn" id="nav-plan" onclick="switchTab('plan')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      PLAN
+    </button>
+  </nav>
+
+</div>
+
+<!-- ACTIVE WORKOUT SCREEN -->
+<div id="active-screen">
+  <div class="active-header">
+    <button class="back-btn" onclick="closeWorkout()">←</button>
+    <div>
+      <div class="active-title bebas" id="active-title">WORKOUT A</div>
+      <div class="active-sub">TAP EACH EXERCISE TO CHECK OFF</div>
+    </div>
+  </div>
+  <div class="active-body">
+    <div class="rounds-row">
+      <div class="rounds-label">ROUNDS:</div>
+      <button class="round-dot active-round" id="rd1" onclick="setRound(1)">1</button>
+      <button class="round-dot" id="rd2" onclick="setRound(2)">2</button>
+      <button class="round-dot" id="rd3" onclick="setRound(3)">3</button>
+      <button class="round-dot" id="rd4" onclick="setRound(4)">4</button>
+    </div>
+    <div class="exercise-list" id="exercise-list"></div>
+    <textarea class="note-area" id="workout-note" placeholder="Notes: 'pushed to 15 pushups', 'felt strong today'..."></textarea>
+    <button class="finish-btn" id="finish-btn" onclick="finishWorkout()">FINISH WORKOUT</button>
+  </div>
+</div>
+
+<!-- COMPLETE OVERLAY -->
+<div id="complete-overlay">
+  <div class="complete-big bebas">DONE!</div>
+  <div class="complete-sub">WORKOUT LOGGED 💪</div>
+</div>
+
+<!-- TOAST -->
+<div id="toast">✓ LOGGED</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div id="delete-modal" style="display:none; position:fixed; inset:0; z-index:500; align-items:flex-end; justify-content:center; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px);">
+  <div style="background:#111118; border:1px solid #2C2C38; border-radius:20px 20px 0 0; padding:28px 20px calc(var(--safe-bottom) + 28px); width:100%; max-width:500px; animation:slideUp 0.25s ease;">
+    <div style="font-family:'Bebas Neue'; font-size:22px; letter-spacing:2px; color:#FF6B35; margin-bottom:8px;" id="modal-title">DELETE ENTRY?</div>
+    <div style="font-size:13px; color:#888; margin-bottom:24px; line-height:1.6;" id="modal-body">This action cannot be undone.</div>
+    <div style="display:flex; gap:10px;">
+      <button onclick="closeModal()" style="flex:1; padding:14px; background:#1C1C28; border:none; border-radius:12px; color:#888; font-family:'DM Mono'; font-size:13px; cursor:pointer; letter-spacing:1px;">CANCEL</button>
+      <button id="modal-confirm-btn" style="flex:1; padding:14px; background:#FF6B35; border:none; border-radius:12px; color:#0A0A0F; font-family:'Bebas Neue'; font-size:18px; letter-spacing:2px; cursor:pointer;">DELETE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORKOUTS = {
+  A: {
+    name: "Workout A", focus: "Push + Core", color: "#FF6B35",
+    exercises: [
+      { id:"a1", name:"Push-ups", target:"10–15 reps" },
+      { id:"a2", name:"Pike Push-ups", target:"8–12 reps" },
+      { id:"a3", name:"Tricep Dips", target:"10–12 reps" },
+      { id:"a4", name:"Plank", target:"30–45 sec" },
+      { id:"a5", name:"Hollow Body Hold", target:"20–30 sec" },
+      { id:"a6", name:"Dead Bug", target:"10 reps/side" },
+    ]
+  },
+  B: {
+    name: "Workout B", focus: "Pull + Core", color: "#4ECDC4",
+    exercises: [
+      { id:"b1", name:"Doorframe / Table Rows", target:"10–12 reps" },
+      { id:"b2", name:"Superman Hold", target:"10 reps (3s hold each)" },
+      { id:"b3", name:"Reverse Snow Angels", target:"12 reps" },
+      { id:"b4", name:"Side Plank", target:"25–35 sec/side" },
+      { id:"b5", name:"Bicycle Crunches", target:"15 reps/side" },
+      { id:"b6", name:"Leg Raises", target:"10–12 reps" },
+    ]
+  },
+  C: {
+    name: "Workout C", focus: "Legs + Full Body", color: "#A78BFA",
+    exercises: [
+      { id:"c1", name:"Squats", target:"15–20 reps" },
+      { id:"c2", name:"Reverse Lunges", target:"10 reps/side" },
+      { id:"c3", name:"Glute Bridges", target:"15 reps" },
+      { id:"c4", name:"Wall Sit", target:"40–60 sec" },
+      { id:"c5", name:"Burpees", target:"8–10 reps" },
+      { id:"c6", name:"Mountain Climbers", target:"20 reps/side" },
+    ]
+  }
+};
+
+const SPORTS = ["🏐 Volleyball","🏓 Pickleball","🏓 Table Tennis","🚶 Walk","🏃 Run","Other"];
+const DAY_LABELS = ["M","T","W","T","F","S","S"];
+const PLAN = [
+  { day:"MON", activity:"Strength A", type:"A", note:"Push + Core" },
+  { day:"TUE", activity:"Play Sports", type:"sport", note:"Volleyball / Pickleball / Table Tennis" },
+  { day:"WED", activity:"Rest", type:"rest", note:"Light walk optional" },
+  { day:"THU", activity:"Strength B", type:"B", note:"Pull + Core" },
+  { day:"FRI", activity:"Sport or Rest", type:"sport", note:"Your call" },
+  { day:"SAT", activity:"Strength C", type:"C", note:"Legs + Full Body" },
+  { day:"SUN", activity:"Full Rest", type:"rest", note:"Recovery is progress 💤" },
+];
+const TIMELINE = [
+  { period:"Weeks 1–3", text:"Soreness & adaptation", color:"#FF6B35" },
+  { period:"Weeks 4–8", text:"Strength gains + better posture", color:"#F7B731" },
+  { period:"Month 3–4", text:"Visible definition, tighter waist", color:"#4ECDC4" },
+  { period:"Month 5–6", text:"Athletic physique taking shape", color:"#C8F135" },
+];
+const TIPS = [
+  "Aim for 0.7–1g protein per lb bodyweight",
+  "Sleep 7–9 hrs — that's when muscle is built",
+  "Add 1 rep each week to keep progressing",
+  "Sports days count as cardio — no running needed!",
+];
+
+let history = {};
+let activeWorkout = null;
+let checked = {};
+let currentRound = 1;
+
+function getDayKey(d = new Date()) {
+  return d.toISOString().split("T")[0];
+}
+
+function load() {
+  try { history = JSON.parse(localStorage.getItem("grind_history") || "{}"); } catch {}
+}
+
+function save() {
+  localStorage.setItem("grind_history", JSON.stringify(history));
+}
+
+function getWeekDates() {
+  const today = new Date();
+  const day = today.getDay();
+  const mon = new Date(today);
+  mon.setDate(today.getDate() - ((day + 6) % 7));
+  return Array.from({length:7}, (_, i) => {
+    const d = new Date(mon); d.setDate(mon.getDate() + i); return d;
+  });
+}
+
+function calcStreak() {
+  let count = 0;
+  const today = new Date();
+  for (let i = 0; i < 90; i++) {
+    const d = new Date(today); d.setDate(today.getDate() - i);
+    if (history[getDayKey(d)]?.workouts?.length) count++;
+    else if (i > 0) break;
+  }
+  return count;
+}
+
+function updateHeader() {
+  const streak = calcStreak();
+  const week = getWeekDates();
+  const todayKey = getDayKey();
+  const weekDone = week.filter(d => history[getDayKey(d)]?.workouts?.length).length;
+  const total = Object.values(history).reduce((a,d) => a + (d.workouts?.length || 0), 0);
+
+  document.getElementById("streak-num").textContent = streak;
+  document.getElementById("stat-total").textContent = total;
+  document.getElementById("stat-streak").textContent = streak + "d";
+  document.getElementById("stat-week").textContent = weekDone;
+
+  const strip = document.getElementById("week-strip");
+  strip.innerHTML = "";
+  week.forEach((date, i) => {
+    const key = getDayKey(date);
+    const isToday = key === todayKey;
+    const done = history[key]?.workouts?.length > 0;
+    strip.innerHTML += `
+      <div class="week-day">
+        <div class="week-day-label${isToday ? " today-lbl" : ""}">${DAY_LABELS[i]}</div>
+        <div class="week-day-dot${done ? " done" : isToday ? " today" : ""}">
+          ${done ? "✓" : date.getDate()}
+        </div>
+      </div>`;
+  });
+
+  document.getElementById("today-date-label").textContent =
+    new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}).toUpperCase();
+}
+
+function renderToday() {
+  const todayKey = getDayKey();
+  const todayData = history[todayKey];
+
+  const loggedBox = document.getElementById("today-logged");
+  if (todayData?.workouts?.length) {
+    loggedBox.style.display = "block";
+    loggedBox.innerHTML = `<div class="logged-box">
+      <div class="logged-title">✓ COMPLETED TODAY</div>
+      ${todayData.workouts.map(w => `
+        <div class="logged-item">
+          <div class="logged-dot" style="background:${w.type === "sport" ? "#F7B731" : (WORKOUTS[w.type]?.color || "#555")}"></div>
+          <div class="logged-name">${w.type === "sport" ? w.label : WORKOUTS[w.type]?.focus}</div>
+          <div class="logged-meta">${w.rounds ? w.rounds + " rds · " : ""}${w.time}</div>
+        </div>`).join("")}
+    </div>`;
+  } else {
+    loggedBox.style.display = "none";
+  }
+
+  const cards = document.getElementById("workout-cards");
+  cards.innerHTML = Object.entries(WORKOUTS).map(([key, w]) => `
+    <div class="workout-card" style="--c:${w.color}; border-left:4px solid ${w.color}" onclick="startWorkout('${key}')">
+      <div>
+        <div class="workout-card-name">${w.name} — ${w.focus}</div>
+        <div class="workout-card-sub">${w.exercises.length} exercises · 4 rounds</div>
+      </div>
+      <div class="workout-card-btn">START →</div>
+    </div>`).join("");
+
+  document.getElementById("sport-grid").innerHTML = SPORTS.map(s => `
+    <div class="sport-chip" onclick="logSport('${s}')">${s}</div>`).join("");
+}
+
+function renderHistory() {
+  const list = document.getElementById("history-list");
+  const keys = Object.keys(history).sort().reverse().filter(k => history[k]?.workouts?.length);
+  if (!keys.length) {
+    list.innerHTML = `<div class="empty-state">No workouts logged yet.<br>Start your first one! 💪</div>`;
+    return;
+  }
+  list.innerHTML = keys.map(date => {
+    const data = history[date];
+    const d = new Date(date + "T12:00:00");
+    const label = d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
+    return `<div class="history-day">
+      <div class="history-day-header">
+        <div class="history-day-date">${label}</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="history-day-count">${data.workouts.length} activit${data.workouts.length > 1 ? "ies" : "y"}</div>
+          <button class="del-btn" onclick="confirmDeleteDay('${date}')" title="Delete day">🗑</button>
+        </div>
+      </div>
+      ${data.workouts.map((w, i) => `
+        <div class="history-item">
+          <div class="logged-dot" style="background:${w.type === "sport" ? "#F7B731" : (WORKOUTS[w.type]?.color || "#555")}"></div>
+          <div class="history-item-name" style="color:${w.type === "sport" ? "#F7B731" : (WORKOUTS[w.type]?.color || "#E8E8E0")}">
+            ${w.type === "sport" ? w.label : WORKOUTS[w.type]?.focus}
+          </div>
+          ${w.rounds ? `<div class="history-item-meta">${w.rounds} rds</div>` : ""}
+          <div class="history-item-meta">${w.time}</div>
+          <button class="del-btn" onclick="confirmDeleteEntry('${date}', ${i})" title="Delete entry">✕</button>
+        </div>
+        ${w.note ? `<div class="history-item-note">"${w.note}"</div>` : ""}`).join("")}
+    </div>`;
+  }).join("");
+}
+
+function renderPlan() {
+  document.getElementById("plan-list").innerHTML = PLAN.map(p => `
+    <div class="plan-row">
+      <div class="plan-day-name">${p.day}</div>
+      <div class="plan-dot" style="background:${p.type === "rest" ? "#2C2C38" : p.type === "sport" ? "#F7B731" : WORKOUTS[p.type]?.color}"></div>
+      <div>
+        <div class="plan-activity">${p.activity}</div>
+        <div class="plan-note">${p.note}</div>
+      </div>
+    </div>`).join("");
+
+  document.getElementById("timeline-list").innerHTML = TIMELINE.map(t => `
+    <div class="timeline-item">
+      <div class="timeline-dot" style="background:${t.color}"></div>
+      <div class="timeline-period">${t.period}</div>
+      <div class="timeline-text">${t.text}</div>
+    </div>`).join("");
+
+  document.getElementById("tips-list").innerHTML = TIPS.map(tip => `
+    <div class="tip-row">→ ${tip}</div>`).join("");
+}
+
+function switchTab(tab) {
+  ["today","history","plan"].forEach(t => {
+    document.getElementById("tab-" + t).style.display = t === tab ? "block" : "none";
+    document.getElementById("nav-" + t).classList.toggle("active", t === tab);
+  });
+  if (tab === "history") renderHistory();
+  if (tab === "plan") renderPlan();
+  if (tab === "today") renderToday();
+}
+
+function startWorkout(type) {
+  activeWorkout = type;
+  checked = {};
+  currentRound = 1;
+  const w = WORKOUTS[type];
+
+  document.getElementById("active-title").textContent = w.focus.toUpperCase();
+  document.getElementById("active-title").style.color = w.color;
+  document.getElementById("active-screen").style.setProperty("--c", w.color);
+  document.getElementById("workout-note").value = "";
+
+  // Rounds
+  [1,2,3,4].forEach(r => {
+    const btn = document.getElementById("rd" + r);
+    btn.className = "round-dot" + (r === 1 ? " active-round" : "");
+    btn.style.background = r === 1 ? w.color : "";
+    btn.style.color = r === 1 ? "#0A0A0F" : "";
+  });
+
+  // Exercises
+  document.getElementById("exercise-list").innerHTML = w.exercises.map(ex => `
+    <div class="exercise-row" id="row-${ex.id}" onclick="toggleEx('${ex.id}')">
+      <div class="ex-check" id="chk-${ex.id}"></div>
+      <div>
+        <div class="ex-name" id="exn-${ex.id}">${ex.name}</div>
+        <div class="ex-target">${ex.target}</div>
+      </div>
+    </div>`).join("");
+
+  updateFinishBtn();
+  document.getElementById("active-screen").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function closeWorkout() {
+  document.getElementById("active-screen").classList.remove("open");
+  document.body.style.overflow = "";
+  activeWorkout = null;
+}
+
+function setRound(r) {
+  currentRound = r;
+  const color = WORKOUTS[activeWorkout].color;
+  [1,2,3,4].forEach(n => {
+    const btn = document.getElementById("rd" + n);
+    btn.classList.toggle("active-round", n === r);
+    btn.style.background = n === r ? color : "";
+    btn.style.color = n === r ? "#0A0A0F" : "";
+  });
+}
+
+function toggleEx(id) {
+  checked[id] = !checked[id];
+  const row = document.getElementById("row-" + id);
+  const chk = document.getElementById("chk-" + id);
+  const name = document.getElementById("exn-" + id);
+  row.classList.toggle("checked", checked[id]);
+  chk.classList.toggle("done", checked[id]);
+  chk.textContent = checked[id] ? "✓" : "";
+  if (checked[id]) {
+    chk.style.borderColor = WORKOUTS[activeWorkout].color;
+    chk.style.background = WORKOUTS[activeWorkout].color;
+  } else {
+    chk.style.borderColor = "";
+    chk.style.background = "";
+  }
+  name.classList.toggle("done", checked[id]);
+  updateFinishBtn();
+}
+
+function updateFinishBtn() {
+  const total = WORKOUTS[activeWorkout].exercises.length;
+  const done = Object.values(checked).filter(Boolean).length;
+  const btn = document.getElementById("finish-btn");
+  const ready = done === total;
+  btn.classList.toggle("ready", ready);
+  btn.textContent = ready ? "FINISH WORKOUT ✓" : `FINISH (${done}/${total} done)`;
+}
+
+function finishWorkout() {
+  const todayKey = getDayKey();
+  const note = document.getElementById("workout-note").value.trim();
+  if (!history[todayKey]) history[todayKey] = {};
+  if (!history[todayKey].workouts) history[todayKey].workouts = [];
+  history[todayKey].workouts.push({
+    type: activeWorkout,
+    rounds: currentRound,
+    note,
+    time: new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),
+  });
+  save();
+
+  const overlay = document.getElementById("complete-overlay");
+  overlay.classList.add("show");
+  setTimeout(() => {
+    overlay.classList.remove("show");
+    closeWorkout();
+    updateHeader();
+    renderToday();
+  }, 2000);
+}
+
+function logSport(sport) {
+  const todayKey = getDayKey();
+  if (!history[todayKey]) history[todayKey] = {};
+  if (!history[todayKey].workouts) history[todayKey].workouts = [];
+  history[todayKey].workouts.push({
+    type: "sport", label: sport,
+    time: new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),
+  });
+  save();
+  updateHeader();
+  renderToday();
+
+  showToast(sport + " logged!");
+}
+
+// Service Worker for offline
+if ("serviceWorker" in navigator) {
+  const swCode = `
+    const CACHE = "grind-v1";
+    const ASSETS = [self.location.href];
+    self.addEventListener("install", e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+    });
+    self.addEventListener("fetch", e => {
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+    });
+  `;
+  const blob = new Blob([swCode], {type:"text/javascript"});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+
+// Delete helpers
+let pendingDelete = null;
+
+function openModal(title, body, onConfirm) {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-body").textContent = body;
+  document.getElementById("modal-confirm-btn").onclick = () => { onConfirm(); closeModal(); };
+  const modal = document.getElementById("delete-modal");
+  modal.style.display = "flex";
+}
+
+function closeModal() {
+  document.getElementById("delete-modal").style.display = "none";
+}
+
+function confirmDeleteEntry(date, index) {
+  const w = history[date].workouts[index];
+  const name = w.type === "sport" ? w.label : WORKOUTS[w.type]?.focus;
+  openModal("DELETE ENTRY?", `Remove "${name}" from ${new Date(date + "T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}? This cannot be undone.`, () => {
+    history[date].workouts.splice(index, 1);
+    if (!history[date].workouts.length) delete history[date];
+    save(); updateHeader(); renderHistory();
+    if (getDayKey() === date) renderToday();
+    showToast("Entry deleted");
+  });
+}
+
+function confirmDeleteDay(date) {
+  const label = new Date(date + "T12:00:00").toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"});
+  openModal("DELETE DAY?", `Remove all entries for ${label}? This cannot be undone.`, () => {
+    delete history[date];
+    save(); updateHeader(); renderHistory();
+    if (getDayKey() === date) renderToday();
+    showToast("Day deleted");
+  });
+}
+
+function confirmClearAll() {
+  const total = Object.values(history).reduce((a,d) => a + (d.workouts?.length || 0), 0);
+  if (!total) return;
+  openModal("CLEAR ALL LOGS?", `This will permanently delete all ${total} workout entries. There is no undo.`, () => {
+    history = {};
+    save(); updateHeader(); renderHistory(); renderToday();
+    showToast("All logs cleared");
+  });
+}
+
+function showToast(msg) {
+  const toast = document.getElementById("toast");
+  toast.textContent = msg;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 2000);
+}
+
+// Init
+load();
+updateHeader();
+renderToday();
+</script>
+</body>
+</html>
